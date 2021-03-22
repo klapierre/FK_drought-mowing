@@ -49,27 +49,32 @@ pH <- read.xlsx('Drought x Mowing pH data.xlsx')%>%
 colnames(pH) #determine column names
 
 
+
+###statistical test
+summary(pHmodel <- aov(pH ~ precip*seas*mow, data=pH))
+check_model(pHmodel)
+pairwise.t.test(pH$pH, pH$precip, p.adj="bonf")
+
+
+
 ###make graphs
 #histogram to check normality
 ggplot(data=pH, aes(x=pH)) +
   geom_histogram()
 
-#dot plot
-ggplot(data=pH, aes(x=precip, y=pH, color=interaction(seas, mow))) +
-  geom_point()
 
-#bar graph
-ggplot(data=barGraphStats(data=pH, variable="pH", byFactorNames=c("seas", "mow", "precip")), aes(x=as.factor(precip), y=mean, fill=interaction(seas, mow))) +
+###bar graphs
+# #just to visualize all the data, but the mowing treatments did not have significant effects
+# ggplot(data=pH, aes(x=as.factor(precip), y=pH, fill=interaction(seas, mow))) +
+#   geom_boxplot() +
+#   scale_fill_brewer(palette='Paired', name='Mowing') +
+#   xlab('Precipitation Difference (%)') + ylab('Soil pH') +
+#   theme(legend.title=element_text(size=20))
+
+ggplot(data=barGraphStats(data=pH, variable="pH", byFactorNames=c("precip")), aes(x=as.factor(precip), y=mean)) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(0.9), width=0.2) +
-  scale_fill_brewer(palette='Paired', name='Mowing') +
   xlab('Precipitation Difference (%)') + ylab('Soil pH') +
-  theme(legend.title=element_text(size=20))
-
-
-
-###statistical test
-pHmodel <- aov(pH ~ precip*seas*mow, data=pH) #ANOVA: check with Kurt, but probably the mowing date should be nested within the mowing treatment?
-summary(pHmodel) #significant effect of precip
-check_model(pHmodel)
-pairwise.t.test(pH$pH, pH$precip, p.adj="bonf")
+  annotate("text", x=1, y=7.5, label='a') +
+  annotate("text", x=2, y=7.5, label='a') +
+  annotate("text", x=3, y=7.8, label='b')
