@@ -27,34 +27,32 @@ theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=elemen
 #read in treatment data
 trt  <- read.xlsx('SIM plots trt.xlsx')
 
-############# SARAH: stop here
 
 #read in plate set-up data
 plate <- read.xlsx('Drought x Mowing EEA plate setup .xlsx')%>% #reads in the data
   select(processing_date, site, sample_year, sample_month, plot, wet_weight, EEA_weight, plate_num, plate_position, envelope_weight)%>% #selects just the columns we want by name
-  full_join(read.xlsx('Drought x Mowing Soil Dry Weights.xlsx'))%>% #import and join on the dry soil weight data -- be sure to have the same column names (including capitalization) between files!
+  full_join(read.xlsx('Drought x Mowing Soil Dry Weights.xlsx'))%>% #import and join on the dry soil weight data
   mutate(processing_date=as.Date(processing_date, origin='1899-12-30'))%>% #fixes the date to be in yyyy-mm-dd format
   mutate(EEA_dry=(EEA_weight*((dry_weight-envelope_weight)/wet_weight)))%>% #calculate EEA dry weight based on wet to dry conversion for soil mositure
-  select(-EEA_weight, -dry_weight, -envelope_weight, -wet_weight)%>% #note that plots 33 and 35 don't have a dry weight associated with them, and 3 and 55 have two weights associated with them. need to reweigh these
-  filter(!(plot %in% c(3, 55, 33, 35))) #get rid of the ones that have messed up dry soil weights for now
+  select(-EEA_weight, -dry_weight, -envelope_weight, -wet_weight)
 
-soilWeight <- plate%>%
+soilWeight <- plate%>% #creates a dataframe with soil weights for each sample in columns associated with each plate, rather than long-form
   select(processing_date, plate_num, plate_position, EEA_dry)%>%
   mutate(plate_position2=paste('soil_weight',plate_position, sep='_'))%>% #makes a new column that we will use to spread the soil weights for each plate into columns to calculate enzyme activities
   select(-plate_position)%>%
   spread(key=plate_position2, value=EEA_dry)
 
-time <- read.xlsx('Drought x Mowing EEA plate time.xlsx')%>%
+time <- read.xlsx('Drought x Mowing EEA plate time.xlsx')%>% #creates a dataframe related to the length of time each assay ran
   select(processing_date, plate_num, enzyme, time_hr)%>%
   filter(!(enzyme %in% c('PPO', 'PER')))%>%
   mutate(processing_date=as.Date(processing_date, origin='1899-12-30'))
 
-fluor <- read.xlsx('Drought x Mowing EEA Fluorescence Data.xlsx')%>%
+fluor <- read.xlsx('Drought x Mowing EEA Fluorescence Data.xlsx')%>% #read in fluorescence data
   select(-notes)%>%
   mutate(processing_date=as.Date(processing_date, origin='1899-12-30'))%>%
-  left_join(time)%>%
-  left_join(soilWeight)%>% #note that there are some missing soil weights beyond the 4 we dropped. is this because some plates have columns that were GxD and not drought x mowing?
-  mutate(
+  left_join(time)%>% #join time data
+  left_join(soilWeight)%>% #join weight data
+  mutate( #calculate enzyme activites for each sample (1-3) within each plate
     #activity 1
     quench1=((quench_control_1-soil_control_1)/standard_control), 
     emmission1=(standard_control/0.5),
@@ -72,17 +70,31 @@ fluor <- read.xlsx('Drought x Mowing EEA Fluorescence Data.xlsx')%>%
     activity3=((net_fluor3*125)/(emmission3*0.2*time_hr*soil_weight_3))
     )%>%
   select(processing_date, enzyme, plate_num, well, activity1, activity2, activity3)%>%
-  gather(key='activity_position', value='activity', activity1, activity2, activity3)%>%
+  gather(key='activity_position', value='activity', activity1, activity2, activity3)%>% #gather into long-form
   separate(col=activity_position, into=c('drop', 'plate_position'), sep='y')%>%
   mutate(plate_position=as.numeric(plate_position))%>%
   select(-drop)%>%
   left_join(plate)%>%
-  filter(!(is.na(activity)), activity>0, activity<2000)%>%
+  filter(!(is.na(plot)))%>% #filter samples that were not from this experiment
+  mutate(activity=ifelse(activity<0, 0, activity))%>% #set activity levels below detection limit to 0 (24 observations)
+  group_by(processing_date, plate_num, enzyme)%>%
+  mutate(plate_mean=mean(activity), plate_sd=sd(activity),
+         plate_CI_upper=plate_mean+(2.58*plate_sd),
+         plate_CI_lower=plate_mean-(2.58*plate_sd))%>% #calculate 99% confidence intervals for each plate
+  ungroup()%>%
+  mutate(plate_flag=ifelse(activity>plate_CI_upper|activity<plate_CI_lower, 1, 0))%>% #flag samples that are outliers for each plate (50 observations)
+  group_by(enzyme)%>%
+  mutate(overall_mean=mean(activity), overall_sd=sd(activity),
+         overall_CI_upper=overall_mean+(2.58*overall_sd),
+         overall_CI_lower=overall_mean-(2.58*overall_sd))%>% #calculate 99% confidence intervals for all data
+  ungroup()%>%
+  mutate(overall_flag=ifelse(activity>overall_CI_upper|activity<overall_CI_lower, 1, 0))%>% #flag samples that are outliers across all data (43 observations)
+  # filter(plate_flag==0, overall_flag==0)%>%
   group_by(site, sample_year, sample_month, plot, enzyme)%>%
   summarise(activity_mean=mean(activity))%>%
   ungroup()
 
-ggplot(data=fluor, aes(x=activity_mean)) +
+ggplot(data=fluor, aes(x=activity)) +
   geom_histogram() +
   facet_wrap(~enzyme, scales='free')
 
