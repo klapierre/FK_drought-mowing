@@ -6,21 +6,11 @@
 ################################################################################
 
 library(openxlsx)
-library(performance)
 library(tidyverse)
 
 
 #kim's laptop
 setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\misc co-author papers\\Fort Keogh_drought x mowing\\EEA data')
-
-
-###set the theme of graphs
-theme_set(theme_bw())
-theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=16),
-             axis.title.y=element_text(size=20, angle=90, vjust=0.5), axis.text.y=element_text(size=16),
-             plot.title = element_text(size=24, vjust=2),
-             panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
-             legend.title=element_text(size=20), legend.text=element_text(size=20))
 
 
 ###read in data
@@ -76,87 +66,25 @@ fluor <- read.xlsx('Drought x Mowing EEA Fluorescence Data.xlsx')%>% #read in fl
   select(-drop)%>%
   left_join(plate)%>%
   filter(!(is.na(plot)))%>% #filter samples that were not from this experiment
-  mutate(activity=ifelse(activity<0, 0, activity))%>% #set activity levels below detection limit to 0 (24 observations)
-  group_by(processing_date, plate_num, enzyme)%>%
-  mutate(plate_mean=mean(activity), plate_sd=sd(activity),
-         plate_CI_upper=plate_mean+(2.58*plate_sd),
-         plate_CI_lower=plate_mean-(2.58*plate_sd))%>% #calculate 99% confidence intervals for each plate
-  ungroup()%>%
-  mutate(plate_flag=ifelse(activity>plate_CI_upper|activity<plate_CI_lower, 1, 0))%>% #flag samples that are outliers for each plate (50 observations)
-  group_by(enzyme)%>%
-  mutate(overall_mean=mean(activity), overall_sd=sd(activity),
-         overall_CI_upper=overall_mean+(2.58*overall_sd),
-         overall_CI_lower=overall_mean-(2.58*overall_sd))%>% #calculate 99% confidence intervals for all data
-  ungroup()%>%
-  mutate(overall_flag=ifelse(activity>overall_CI_upper|activity<overall_CI_lower, 1, 0))%>% #flag samples that are outliers across all data (43 observations)
-  # filter(plate_flag==0, overall_flag==0)%>%
+  filter(activity>0)%>% #remove samples where activity was below detection limit (24 observations)
+  mutate(flag=ifelse(enzyme=='AP'&activity>1100, 1,
+                     ifelse(enzyme=='BG'&activity>350, 1,
+                            ifelse(enzyme=='BX'&activity>60, 1,
+                                   ifelse(enzyme=='CB'&activity>80, 1,
+                                          ifelse(enzyme=='LAP'&activity>50, 1,
+                                                 ifelse(enzyme=='NAG'&activity>200, 1, 0)))))))%>%
+  filter(flag==0)%>% #filter out wells that were outliers in activity levels (drops 17 observations)
   group_by(site, sample_year, sample_month, plot, enzyme)%>%
-  summarise(activity_mean=mean(activity))%>%
-  ungroup()
+  summarise(activity_mean=mean(activity), length=length(activity))%>% #calculate mean activity levels across all technical replicates for each plot
+  ungroup() #check length to ensure each plot has at least 5 technical reps (3 plot*enzyme combos have 5 reps, 4 have 6, 24 have 7, remaining 328 have all 8 tech reps)
 
-ggplot(data=fluor, aes(x=activity)) +
+ggplot(data=fluor, aes(x=activity_mean)) +
   geom_histogram() +
   facet_wrap(~enzyme, scales='free')
 
 
-# #dropping outliers
-# fluorPlateOutliers <- fluor%>%
-#   group_by(processing_date, enzyme, plate_num, plate_position)%>%
-#   summarise(plate_mean=mean(activity), plate_sd=sd(activity))%>%
-#   ungroup()
-# 
-# fluorOverallOutliers <- fluor%>%
-#   group_by(enzyme)%>%
-#   summarise(overall_mean=mean(activity), overall_sd=sd(activity))%>%
-#   ungroup()
-  
-
-
-############# SARAH: start here
-
-
 fluorTrt <- fluor%>%
-  left_join(trt)
+  left_join(trt)%>%
+  mutate(seas=as.factor(seas), mow=as.factor(mow), precip=as.factor(precip))
 
-str(fluorTrt) #tells you what R thinks each column is
-
-ggplot(data=fluorTrt, aes(x=as.factor(precip), y=activity_mean, color=interaction(mow,seas))) +
-  geom_boxplot() +
-  xlab('Precipitation (%)') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
-  scale_color_brewer(palette='Paired', name='Mowing') +
-  facet_wrap(~enzyme, scales='free') #sarah, no need to include facet_wrap statement
-
-
-#the plots below are not a great way to look at the data because they look at each trt individually
-
-ggplot(data=fluorTrt, aes(x=as.factor(precip), y=activity_mean)) +
-  geom_boxplot() +
-  xlab('Precipitation (%)') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
-  facet_wrap(~enzyme, scales='free') #sarah, no need to include facet_wrap statement
-
-ggplot(data=fluorTrt, aes(x=as.factor(mow), y=activity_mean)) +
-  geom_boxplot() +
-  xlab('Mowing Height (cm)') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
-  facet_wrap(~enzyme, scales='free') #sarah, no need to include facet_wrap statement
-
-ggplot(data=fluorTrt, aes(x=as.factor(seas), y=activity_mean)) +
-  geom_boxplot() +
-  xlab('Mowing Season') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
-  facet_wrap(~enzyme, scales='free') #sarah, no need to include facet_wrap statement
-
-
-
-###running ANOVAs -- sarah, you'll just have to run one ANOVA model for ph and you don't have to do the subset step for the data
-apANOVA <- aov(activity_mean ~ as.factor(precip)*as.factor(mow)*seas, data=subset(fluorTrt, enzyme=='AP'))
-summary(apANOVA)
-
-summary(bgANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='BG')))
-
-summary(bxANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='BX')))
-summary(bxANOVA <- aov(activity_mean ~ as.factor(mow)*seas, data=subset(fluorTrt, enzyme=='BX'&precip==100)))
-
-summary(cbANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='CB')))
-
-summary(lapANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='LAP')))
-
-summary(nagANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='NAG')))
+rm(list = setdiff(ls(), "fluorTrt"))
