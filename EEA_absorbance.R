@@ -1,5 +1,5 @@
 ################################################################################
-##  EEA_fluorescence.R: Analyses examining fluorescence extracellular enzyme activity for Fort Keogh drought x mowing experiment
+##  EEA_absorbance.R: Calculating extracellular enzyme activity for Fort Keogh drought x mowing experiment
 ##
 ##  Author: Kimberly Komatsu
 ##  Date created: September 10, 2020

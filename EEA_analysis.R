@@ -1,3 +1,10 @@
+################################################################################
+##  EEA_analysis.R: Examining effects of mowing and drought on extracellular enzyme activitites.
+##
+##  Author: Kimberly Komatsu
+##  Date created: March 23, 2021
+################################################################################
+
 library(performance)
 library(tidyverse)
 
