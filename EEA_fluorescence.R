@@ -85,6 +85,8 @@ ggplot(data=fluor, aes(x=activity_mean)) +
 
 fluorTrt <- fluor%>%
   left_join(trt)%>%
-  mutate(seas=as.factor(seas), mow=as.factor(mow), precip=as.factor(precip))
+  mutate(seas=as.factor(seas), mow=as.factor(mow), precip=as.factor(precip))%>%
+  select(-length)%>%
+  rename(activity=activity_mean)
 
 rm(list = c('fluor', 'plate', 'soilWeight', 'time', 'trt'))
