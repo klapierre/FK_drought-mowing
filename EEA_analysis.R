@@ -37,39 +37,44 @@ theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=elemen
 
 ###source data
 source('C:\\Users\\lapie\\Desktop\\R files laptop\\FK_drought-mowing\\EEA_fluorescence.R')
+source('C:\\Users\\lapie\\Desktop\\R files laptop\\FK_drought-mowing\\EEA_absorbance.R')
 
 
+###combining data
+activityTrt <- absTrt%>%
+  select(site, sample_year, sample_month, plot, enzyme, activity, seas, mow, precip)%>%
+  rbind(fluorTrt)
 
-
+# write.csv(activityTrt, 'Drought x Mowing_EEA_final.csv', row.names=F)
 
 ###running ANOVAs
-summary(apANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='AP'))) #no significant effects
+summary(apANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='AP'))) #no significant effects
 check_model(apANOVA)
 
-summary(bgANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='BG'))) #significant effect of season of mowing: mowing on October leads to higher activity than mowing in June
+summary(bgANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='BG'))) #significant effect of season of mowing: mowing on October leads to higher activity than mowing in June
 check_model(bgANOVA)
 
-summary(bxANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='BX'))) #no significant effects
+summary(bxANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='BX'))) #no significant effects
 check_model(bxANOVA)
 
-summary(cbANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='CB'))) #no significant effects
+summary(cbANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='CB'))) #no significant effects
 check_model(cbANOVA)
 
-summary(lapANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='LAP'))) #no significant effects
+summary(lapANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='LAP'))) #no significant effects
 check_model(lapANOVA)
 
-summary(nagANOVA <- aov(activity_mean ~ precip*mow*seas, data=subset(fluorTrt, enzyme=='NAG'))) #significant effect of season of mowing: mowing on October leads to higher activity than mowing in June
+summary(nagANOVA <- aov(activity ~ precip*mow*seas, data=subset(activityTrt, enzyme=='NAG'))) #significant effect of season of mowing: mowing on October leads to higher activity than mowing in June
 check_model(nagANOVA)
 
 
 #figures
-ggplot(data=fluorTrt, aes(x=precip, y=activity_mean, color=interaction(mow,seas))) +
+ggplot(data=subset(activityTrt, !(enzyme %in% c('PER', 'PPO'))), aes(x=precip, y=activity, color=interaction(mow,seas))) +
   geom_boxplot() +
   xlab('Precipitation (%)') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
   scale_color_brewer(palette='Paired', name='Mowing') +
   facet_wrap(~enzyme, scales='free')
 
-ggplot(data=barGraphStats(data=fluorTrt, variable="activity_mean", byFactorNames=c("seas", "enzyme")), aes(x=seas, y=mean)) +
+ggplot(data=barGraphStats(data=subset(activityTrt, !(enzyme %in% c('PER', 'PPO'))), variable="activity", byFactorNames=c("seas", "enzyme")), aes(x=seas, y=mean)) +
   geom_bar(stat='identity') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
   xlab('Mowing Season') + ylab('Extracellular Enzyme Activity (nmol/hr/g)') +
