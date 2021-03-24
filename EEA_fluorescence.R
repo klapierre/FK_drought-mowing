@@ -87,4 +87,4 @@ fluorTrt <- fluor%>%
   left_join(trt)%>%
   mutate(seas=as.factor(seas), mow=as.factor(mow), precip=as.factor(precip))
 
-rm(list = setdiff(ls(), "fluorTrt"))
+rm(list = c('fluor', 'plate', 'soilWeight', 'time', 'trt'))

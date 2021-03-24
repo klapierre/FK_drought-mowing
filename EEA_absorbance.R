@@ -77,4 +77,4 @@ absTrt <- abs%>%
   left_join(trt)%>%
   mutate(seas=as.factor(seas), mow=as.factor(mow), precip=as.factor(precip))
 
-rm(list = setdiff(ls(), "absTrt"))
+rm(list = c('abs', 'plate', 'soilWeight', 'time', 'trt'))
